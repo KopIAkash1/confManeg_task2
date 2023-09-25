@@ -1,22 +1,66 @@
 import json
 import requests
+import sys
+import webbrowser
 
-if __name__ == "__main__":
-    ## ЭТАП ПОДКЛЮЧЕНИЯ К САЙТУ
+def getGraphizForLib(requiresDist, libName):
+    allPath = ""
+    nextLine = "%3B%0A%20%20"
+    if requiresDist != None:
+        for item in requiresDist:
+            allPath += libName + "->" + str(item) + nextLine
+    return allPath
+
+
+def getRequiresDist(libName):
     mask = "https://pypi.org/pypi/"
     mask2 = "/json"
-    while True:
-        libName = input("Enter name of lib -> ")
-        url = mask + libName + mask2
-        site = requests.get(url=url)
-        if(site.status_code == 404):
-            print("The library with this name could not be obtained! Enter another name.")
-        else:
-            break
-    ## ЭТАП СОЗДАНИЯ JSON
+    url = mask + libName + mask2
+    site = requests.get(url=url)
+    if (site.status_code == 404):
+        print("The library with this name could not be obtained! Enter another name.")
+        return None
     jsonFile = json.loads(site.text)
-    requiresDist = jsonFile['info']['requires_dist']
-    #ФОРМАТИРОВАНИЕ ТЕКСТА В УДОБНЫЙ ФОРМАТ
-    for i in range(0,len(requiresDist)):
-        requiresDist[i] = str(requiresDist[i]).split('>',1)[0]
-    #print(requiresDist)
+    return jsonFile
+
+
+def formatingRequires(requiresDist):
+    if not (requiresDist == None):
+        for i in range(0, len(requiresDist)):
+            requiresDist[i] = str(requiresDist[i]).split('>', 1)[0].split('<', 1)[0].split("extra", 1)[0].split('[', 1)[0].split(';',1)[0].split('=', 1)[0]
+            requiresDist[i] = str(requiresDist[i]).replace('-', '_')
+    return requiresDist
+
+
+def childRequiresDist(requiresDist, childPath="", ):
+    if requiresDist != None:
+        for item in requiresDist:
+            jsonFile = getRequiresDist(str(item))
+            if(jsonFile != None):
+                requiresDist = formatingRequires(jsonFile['info']['requires_dist'])
+                libName = jsonFile['info']['name']
+                childPath += getGraphizForLib(requiresDist, libName)
+                childRequiresDist(requiresDist, childPath)
+    return childPath
+
+
+if __name__ == "__main__":
+    while True:
+        if sys.argv != "--script":
+            print("No such command in script")
+        else:
+            ## ЭТАП ПОДКЛЮЧЕНИЯ К САЙТУ
+            graphizSite = "https://dreampuf.github.io/GraphvizOnline/#digraph%20G%20%7B%0A%20%20%20%20"
+            graphizSite2 = "%0A%7D"
+            allPat = ""
+            nextName = ""
+            libName = sys.argv[2]
+
+            ## ЭТАП СОЗДАНИЯ JSON
+            jsonFile = getRequiresDist(libName)
+            requiresDist = jsonFile['info']['requires_dist']
+            libName = jsonFile['info']['name']
+            requiresDist = formatingRequires(requiresDist)  # ФОРМАТИРОВАНИЕ ТЕКСТА В УДОБНЫЙ ФОРМАТ
+            siteReq = graphizSite + getGraphizForLib(requiresDist, libName) + graphizSite2
+            print(siteReq)
+            webbrowser.open(siteReq)
